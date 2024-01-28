@@ -1,0 +1,70 @@
+<head>
+<script>
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+var context = new AudioContext();
+
+function audioBufferToText(audioBuffer)
+{
+	var buffer = audioBuffer.getChannelData(0);
+		
+	if(audioBuffer.numberOfChannels > 1)
+	{
+		for(var c = 1; c < audioBuffer.numberOfChannels; c++)
+		{
+			var cb = audioBuffer.getChannelData(c);
+			for(var i = 0; i < length; i++)
+				buffer[i] += cb[i];
+		}
+	}
+	
+	var scale = audioBuffer.sampleRate / 24000;
+	var length = Math.floor((buffer.length - 1) / scale); 
+	var b = new Float32Array(length);
+	for(var i = 0; i < length; i++)
+	{
+		p = Math.floor(i * scale);
+		b[i] = buffer[p];
+	}
+	buffer = b;
+	
+	let text = [];
+
+	var max = 0;
+	for(var i = 0; i < buffer.length; i++)
+		max = Math.max(Math.abs(buffer[i]), max);
+	if(max == 0) max = 1;
+	for(var i = 0; i < buffer.length; i++)
+	{
+		text.push(Math.round(buffer[i] / max * 127));
+	}
+	return text;
+}
+
+function convert(event)
+{
+	var audioBuffer = null;
+	var reader = new FileReader();
+	var file = event.target.files[0];
+	reader.onload = function(){
+	    context.decodeAudioData(reader.result, function(buffer) {
+			let array = audioBufferToText(buffer);
+			fetch('https://cors-anywhere.herokuapp.com/' + 'http://192.168.0.202:80/data', {
+				method: 'POST',
+				headers: {
+					'Accept': 'application/text',
+					'Content-Type': 'application/text'
+				},
+				body: audioBufferToText(buffer)
+			})
+			.then(response => console.log(response))
+		}, function(){
+		});
+	}
+	reader.readAsArrayBuffer(file);
+}
+</script>
+</head>
+<body>
+<input type="file" onchange="convert(event)"><br><br>
+Export: <input id="normalize" type="checkbox" checked>normalize <input id="resample" type="checkbox">resample <input id="samplerate" value="11025"><br>
+</body></html>
